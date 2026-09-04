@@ -371,7 +371,7 @@
     ctx.closePath();
   }
 
-  // ---------- Web Audio Synthesizer ----------
+  // ---------- Web Audio Synthesizer & Meme SFX ----------
   let actx = null;
   function ensureAudio(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
   function blip(freq, dur, type, gainVal){
@@ -386,6 +386,24 @@
       osc.connect(gain).connect(actx.destination);
       osc.start(); osc.stop(actx.currentTime + dur);
     }catch(e){}
+  }
+
+  // Preload Meme Audio Tracks
+  const audioDisappointed = new Audio('https://www.myinstants.com/media/sounds/spongebob-fail.mp3');
+  audioDisappointed.preload = 'auto';
+
+  const audioTumTum = new Audio('https://www.myinstants.com/media/sounds/tuntuntun-sahur.mp3');
+  audioTumTum.preload = 'auto';
+
+  const audioWow = new Audio('https://www.myinstants.com/media/sounds/anime-wow-sound-effect.mp3');
+  audioWow.preload = 'auto';
+
+  function playSound(audioObj){
+    try {
+      audioObj.currentTime = 0;
+      audioObj.volume = 0.85;
+      audioObj.play().catch(() => {});
+    } catch(e){}
   }
 
   // ---------- Navigation & Palette Control ----------
@@ -527,6 +545,7 @@
   };
   A.gameOver = function(){
     screen = 'ascendOver';
+    playSound(audioDisappointed);
     A.current = null;
     if(A.score > A.best){ A.best = A.score; document.getElementById('ascendFinalBestLbl').textContent = 'New best'; }
     else { document.getElementById('ascendFinalBestLbl').textContent = 'Best'; }
@@ -645,7 +664,7 @@
       const perfect = diff <= P.zoneHalf*0.35;
       P.combo++; P.score += perfect ? 2 : 1;
       blip(perfect ? 580 : 360, 0.14, 'triangle', 0.14);
-      if(combo >= 3) popCombo(P.combo + 'x combo', 'var(--accent-a)');
+      if(P.combo >= 3) popCombo(P.combo + 'x combo', 'var(--accent-a)');
       P.updateHUD(); P.spawnZone();
     } else {
       P.combo = 0; P.lives--;
@@ -656,6 +675,7 @@
   };
   P.gameOver = function(){
     screen = 'pulseOver';
+    playSound(audioDisappointed);
     if(P.score > P.best){ P.best = P.score; document.getElementById('pulseFinalBestLbl').textContent = 'New best'; }
     else { document.getElementById('pulseFinalBestLbl').textContent = 'Best'; }
     document.getElementById('pulseFinalScore').textContent = P.score;
@@ -702,7 +722,8 @@
     }
     ctx.restore();
   };
-// ============================================================
+
+  // ============================================================
   // 3. GAME: PRISM
   // ============================================================
   const PRISM = {
@@ -730,6 +751,7 @@
   };
   PRISM.gameOver = function(){
     screen = 'prismOver';
+    playSound(audioTumTum);
     blip(80, 0.45, 'sawtooth', 0.25);
     PRISM.shake = 22;
     if(PRISM.score > PRISM.best){ PRISM.best = PRISM.score; document.getElementById('prismFinalBestLbl').textContent = 'New best'; }
@@ -841,6 +863,7 @@
   };
   S.gameOver = function(){
     screen = 'surgeOver';
+    playSound(audioTumTum);
     blip(90, 0.4, 'sawtooth', 0.22);
     S.shake = 20;
     if(S.score > S.best){ S.best = S.score; document.getElementById('surgeFinalBestLbl').textContent = 'New best'; }
@@ -922,8 +945,7 @@
 
     ctx.restore();
   };
-
-  // ============================================================
+// ============================================================
   // 5. GAME: SHADOW WEAVER
   // ============================================================
   const SP = {
@@ -988,6 +1010,7 @@
   };
   SP.gameOver = function(){
     screen = 'spideyOver';
+    playSound(audioWow);
     SP.shake = 20;
     if(SP.score > SP.best){ SP.best = SP.score; document.getElementById('spideyFinalBestLbl').textContent = 'New best'; }
     else { document.getElementById('spideyFinalBestLbl').textContent = 'Best'; }
@@ -1074,7 +1097,8 @@
         ctx.save(); ctx.fillStyle = '#ff0033'; ctx.shadowColor = '#ff0033'; ctx.shadowBlur = 20;
         ctx.beginPath(); ctx.arc(d.x - SP.camX, d.y, d.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
       }
-            // Spider Hero Acrobat Sprite
+      
+      // Spider Hero Acrobat Sprite
       const hx = SP.hero.x - SP.camX;
       const hy = SP.hero.y;
       const swingAngle = Math.atan2(SP.hero.vy, SP.hero.vx) * 0.45;
@@ -1111,7 +1135,8 @@
       ctx.moveTo(-5, -8); ctx.lineTo(5, -8); ctx.lineTo(3, 7); ctx.lineTo(-3, 7);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = '#bf5af2'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.strokeStyle = '#bf5af2'; ctx.lineWidth = 1.2;
+      ctx.stroke();
 
       // Mask Head & Eyes
       ctx.fillStyle = '#1a0d2e';
@@ -1128,7 +1153,6 @@
       ctx.moveTo(4.5, -15); ctx.lineTo(1.5, -13); ctx.lineTo(4, -11); ctx.closePath(); ctx.fill();
 
       ctx.restore();
-
     }
 
     ctx.strokeStyle = 'rgba(191, 90, 242, 0.28)'; ctx.lineWidth = 1.2; ctx.beginPath();
@@ -1140,7 +1164,8 @@
     ctx.stroke();
     ctx.restore();
   };
-// ============================================================
+
+  // ============================================================
   // Shared Render Loop
   // ============================================================
   let hubPulse = 0;
