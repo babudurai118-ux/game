@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
+<style id="mainStyles">
   :root{
     --ink: #f4f2ff;
     --ink-dim: rgba(244,242,255,0.56);
@@ -170,6 +170,27 @@
     backdrop-filter: blur(10px);
   }
   .hint.hide{ display:none; }
+
+  /* Dynamic TV Optimization Styles (Injected if device is TV) */
+  body.is-tv .score-card,
+  body.is-tv .lives-card,
+  body.is-tv .hud-card {
+    background: #0f0a1d !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5) !important;
+  }
+  body.is-tv .panel {
+    background: #0d0818 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
+  }
+  body.is-tv .hint span {
+    background: #150f28 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
 </style>
 </head>
 <body>
@@ -221,7 +242,7 @@
   </div>
 </div>
 
-<!-- ASCEND: Mode select & Over -->
+<!-- ASCEND -->
 <div class="overlay hidden" id="ascendMenuOverlay">
   <div class="panel">
     <div class="title">ASCEND</div>
@@ -250,7 +271,7 @@
   </div>
 </div>
 
-<!-- PULSE: Menu & Over -->
+<!-- PULSE -->
 <div class="overlay hidden" id="pulseMenuOverlay">
   <div class="panel">
     <div class="title">PULSE</div>
@@ -272,7 +293,7 @@
   </div>
 </div>
 
-<!-- PRISM: Menu & Over -->
+<!-- PRISM -->
 <div class="overlay hidden" id="prismMenuOverlay">
   <div class="panel">
     <div class="title">PRISM</div>
@@ -294,7 +315,7 @@
   </div>
 </div>
 
-<!-- SURGE: Menu & Over -->
+<!-- SURGE -->
 <div class="overlay hidden" id="surgeMenuOverlay">
   <div class="panel">
     <div class="title">SURGE</div>
@@ -316,7 +337,7 @@
   </div>
 </div>
 
-<!-- SHADOW WEAVER: Menu & Over -->
+<!-- SHADOW WEAVER -->
 <div class="overlay hidden" id="spideyMenuOverlay">
   <div class="panel">
     <div class="title">SHADOW WEAVER</div>
@@ -340,21 +361,41 @@
 
 <script>
 (function(){
+  // ============================================================
+  // Device & Smart TV Detection
+  // ============================================================
+  const ua = navigator.userAgent || '';
+  const isSmartTV = (
+    /TV|SmartTV|GoogleTV|AppleTV|HbbTV|NetCast|webOS|Tizen|POV_TV|Viera|BRAVIA|AFTT|Roku|MiTV|Hisense|PlayStation|Xbox/i.test(ua) ||
+    window.matchMedia('(display-mode: tv)').matches
+  );
+
+  if (isSmartTV) {
+    document.body.classList.add('is-tv');
+  }
+
   const canvas = document.getElementById('stage');
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { alpha: false, desynchronized: isSmartTV });
   let W, H, DPR;
 
+  function setCanvasShadow(color, blur){
+    if(isSmartTV) return; // Completely eliminate expensive shadow rendering on Smart TVs
+    ctx.shadowColor = color;
+    ctx.shadowBlur = blur;
+  }
+
   function resize(){
-    DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+    // On TVs, cap DPR strictly to 1.0 to prevent 4K frame buffer stalling
+    DPR = isSmartTV ? 1 : Math.min(window.devicePixelRatio || 1, 2.5);
     W = window.innerWidth;
     H = window.innerHeight;
     canvas.width = Math.max(1, Math.round(W * DPR));
     canvas.height = Math.max(1, Math.round(H * DPR));
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
-    ctx.setTransform(DPR,0,0,DPR,0,0);
-    P.cx = W/2; P.cy = H/2 - 10;
-    P.R = Math.min(W,H) * 0.32;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    P.cx = W / 2; P.cy = H / 2 - 10;
+    P.R = Math.min(W, H) * 0.32;
   }
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 60));
@@ -371,7 +412,7 @@
     ctx.closePath();
   }
 
-  // ---------- Web Audio Synthesizer & Meme SFX ----------
+  // ---------- Web Audio & Game-Over Memes ----------
   let actx = null;
   function ensureAudio(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
   function blip(freq, dur, type, gainVal){
@@ -388,7 +429,6 @@
     }catch(e){}
   }
 
-  // Preload Meme Audio Tracks
   const audioDisappointed = new Audio('https://www.myinstants.com/media/sounds/spongebob-fail.mp3');
   audioDisappointed.preload = 'auto';
 
@@ -400,9 +440,11 @@
 
   function playSound(audioObj){
     try {
+      audioObj.pause();
       audioObj.currentTime = 0;
       audioObj.volume = 0.85;
-      audioObj.play().catch(() => {});
+      const p = audioObj.play();
+      if(p !== undefined) p.catch(() => {});
     } catch(e){}
   }
 
@@ -522,7 +564,8 @@
       placedLeft = prevLeft; placedWidth = prev.width;
       A.combo++; A.flashT = 0.18;
       blip(520 + Math.min(A.combo,12)*30, 0.16, 'triangle', 0.14);
-      for(let i=0;i<10;i++){
+      const count = isSmartTV ? 4 : 10;
+      for(let i=0; i<count; i++){
         const a = Math.random()*Math.PI*2, sp = 70+Math.random()*120;
         A.particles.push({ x:prevLeft, y:rowY+20, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-50, life:0.5, maxLife:0.5, size:3, hue:A.current.hue });
       }
@@ -559,7 +602,7 @@
     if(!fin(x) || !fin(y) || !fin(w) || !fin(h) || !fin(squash) || w <= 0) return;
     const cyy = y + h/2, sh = Math.max(1, h * squash), dy = cyy - sh/2;
     ctx.save();
-    if(glow){ ctx.shadowColor = hsl(hue, 85, 60, 0.55); ctx.shadowBlur = 22; }
+    if(glow && !isSmartTV){ ctx.shadowColor = hsl(hue, 85, 60, 0.55); ctx.shadowBlur = 22; }
     const grad = ctx.createLinearGradient(x, dy, x, dy+sh);
     grad.addColorStop(0, hsl(hue, 82, 66, 1)); grad.addColorStop(1, hsl(hue, 78, 46, 1));
     ctx.fillStyle = grad;
@@ -657,8 +700,6 @@
   P.action = function(){
     if(screen !== 'pulsePlay') return;
     const diff = Math.abs(P.angDiff(P.dotAngle, P.zoneCenter));
-    const px = P.cx + Math.cos(P.dotAngle)*P.R, py = P.cy + Math.sin(P.dotAngle)*P.R;
-    const hue = P.hueNow();
 
     if(diff <= P.zoneHalf){
       const perfect = diff <= P.zoneHalf*0.35;
@@ -701,13 +742,16 @@
     ctx.beginPath();
     ctx.arc(P.cx,P.cy,P.R, P.zoneCenter-P.zoneHalf, P.zoneCenter+P.zoneHalf);
     ctx.strokeStyle = hsl(hue, 85, 62, 0.95); ctx.lineWidth = 12; ctx.lineCap = 'round';
-    ctx.shadowColor = hsl(hue, 90, 60, 0.8); ctx.shadowBlur = 18; ctx.stroke(); ctx.shadowBlur = 0;
+    setCanvasShadow(hsl(hue, 90, 60, 0.8), 18);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
 
     if(screen === 'pulsePlay'){
       P.dotAngle += P.dir*P.speed*dt;
       P.dotAngle = ((P.dotAngle % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
       P.trail.unshift({ x: P.cx + Math.cos(P.dotAngle)*P.R, y: P.cy + Math.sin(P.dotAngle)*P.R });
-      if(P.trail.length > 14) P.trail.pop();
+      const maxTrail = isSmartTV ? 6 : 14;
+      if(P.trail.length > maxTrail) P.trail.pop();
     }
     for(let i=P.trail.length-1;i>=0;i--){
       const t = P.trail[i], a = 1 - i/P.trail.length;
@@ -716,9 +760,11 @@
     }
     if(P.trail.length){
       const h = P.trail[0];
-      ctx.save(); ctx.shadowColor = hsl(hue, 90, 65, 0.9); ctx.shadowBlur = 20;
+      ctx.save();
+      setCanvasShadow(hsl(hue, 90, 65, 0.9), 20);
       ctx.fillStyle = hsl(hue, 95, 68, 1);
-      ctx.beginPath(); ctx.arc(h.x, h.y, 11, 0, Math.PI*2); ctx.fill(); ctx.restore();
+      ctx.beginPath(); ctx.arc(h.x, h.y, 11, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
     }
     ctx.restore();
   };
@@ -728,12 +774,12 @@
   // ============================================================
   const PRISM = {
     score: 0, best: 0, combo: 0, polarity: 'cyan',
-    beams: [], particles: [], rings: [], spawnTimer: 0, shake: 0, prismScale: 1
+    beams: [], rings: [], spawnTimer: 0, shake: 0, prismScale: 1
   };
   const CYAN = '#00f2fe', AMBER = '#ff8b00';
   PRISM.reset = function(){
     PRISM.score = 0; PRISM.combo = 0; PRISM.polarity = 'cyan';
-    PRISM.beams = []; PRISM.particles = []; PRISM.rings = [];
+    PRISM.beams = []; PRISM.rings = [];
     PRISM.spawnTimer = 0; PRISM.shake = 0;
     PRISM.updateHUD();
   };
@@ -793,7 +839,7 @@
         if(b.color === PRISM.polarity){
           b.absorbed = true; PRISM.combo++; PRISM.score += 1;
           const hitColor = PRISM.polarity === 'cyan' ? CYAN : AMBER;
-          PRISM.rings.push({ r: shieldRadius, alpha: 1, color: hitColor });
+          if(!isSmartTV) PRISM.rings.push({ r: shieldRadius, alpha: 1, color: hitColor });
           blip(320 + Math.min(PRISM.combo, 15) * 30, 0.12, 'sine', 0.15);
           if(PRISM.combo >= 3) popCombo(PRISM.combo + 'x COMBO', hitColor);
           PRISM.updateHUD(); PRISM.beams.splice(i, 1);
@@ -805,7 +851,9 @@
 
     for(const b of PRISM.beams){
       const col = b.color === 'cyan' ? CYAN : AMBER;
-      ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 16; ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.save();
+      setCanvasShadow(col, 16);
+      ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(cx, b.y); ctx.lineTo(cx, b.y - (b.fromTop ? b.length : -b.length)); ctx.stroke();
       ctx.restore();
     }
@@ -821,7 +869,8 @@
     const curColor = PRISM.polarity === 'cyan' ? CYAN : AMBER;
     const curRadius = shieldRadius * PRISM.prismScale;
     ctx.save();
-    ctx.shadowColor = curColor; ctx.shadowBlur = 24; ctx.strokeStyle = curColor; ctx.lineWidth = 3.5;
+    setCanvasShadow(curColor, 24);
+    ctx.strokeStyle = curColor; ctx.lineWidth = 3.5;
     ctx.beginPath(); ctx.arc(cx, cy, curRadius, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = curColor; ctx.globalAlpha = 0.12; ctx.fill();
     ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
@@ -829,13 +878,12 @@
 
     ctx.restore();
   };
-
   // ============================================================
   // 4. GAME: SURGE
   // ============================================================
   const S = {
     score: 0, best: 0, combo: 0, targetLane: 1, laneDir: 1, playerX: 0, playerY: 0,
-    obstacles: [], particles: [], speed: 460, spawnTimer: 0, shake: 0
+    obstacles: [], speed: 460, spawnTimer: 0, shake: 0
   };
   S.getLaneX = function(idx){
     const trackWidth = Math.min(W * 0.75, 300);
@@ -845,7 +893,7 @@
   S.reset = function(){
     S.score = 0; S.combo = 0; S.targetLane = 1; S.laneDir = 1;
     S.playerX = S.getLaneX(1); S.playerY = H * 0.8;
-    S.obstacles = []; S.particles = []; S.speed = 460; S.spawnTimer = 0; S.shake = 0;
+    S.obstacles = []; S.speed = 460; S.spawnTimer = 0; S.shake = 0;
     S.updateHUD();
   };
   S.updateHUD = function(){
@@ -924,10 +972,12 @@
 
       ctx.save();
       if(ob.isGate){
-        ctx.strokeStyle = '#ffaa00'; ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 14; ctx.lineWidth = 3;
+        ctx.strokeStyle = '#ffaa00'; ctx.lineWidth = 3;
+        setCanvasShadow('#ffaa00', 14);
         ctx.strokeRect(obX - 22, ob.y - 8, 44, 16);
       } else {
-        ctx.fillStyle = '#ff0055'; ctx.shadowColor = '#ff0055'; ctx.shadowBlur = 16;
+        ctx.fillStyle = '#ff0055';
+        setCanvasShadow('#ff0055', 16);
         ctx.fillRect(obX - 24, ob.y - 7, 48, 14);
       }
       ctx.restore();
@@ -935,7 +985,8 @@
 
     // Player Tracer
     ctx.save();
-    ctx.fillStyle = '#ffffff'; ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 20;
+    ctx.fillStyle = '#ffffff';
+    setCanvasShadow('#ffaa00', 20);
     ctx.beginPath();
     ctx.moveTo(S.playerX, S.playerY - 14);
     ctx.lineTo(S.playerX + 10, S.playerY + 12);
@@ -945,19 +996,20 @@
 
     ctx.restore();
   };
-// ============================================================
+
+  // ============================================================
   // 5. GAME: SHADOW WEAVER
   // ============================================================
   const SP = {
     score: 0, best: 0, health: 3, holdingWeb: false, shake: 0, lightning: 0, camX: 0, scareTime: 0,
     hero: { x: 100, y: 300, vx: 220, vy: -60, r: 9, webAttached: false, anchorX: 0, anchorY: 0, ropeLength: 0 },
-    buildings: [], demons: [], rain: [], particles: []
+    buildings: [], demons: [], rain: []
   };
 
   SP.initWorld = function(){
     SP.score = 0; SP.health = 3; SP.hero.x = 100; SP.hero.y = H * 0.45; SP.hero.vx = 220; SP.hero.vy = -60;
     SP.hero.webAttached = false; SP.camX = 0; SP.shake = 0; SP.lightning = 0;
-    SP.buildings = []; SP.demons = []; SP.particles = [];
+    SP.buildings = []; SP.demons = [];
     SP.updateHealthHUD(); SP.updateHUD();
 
     let bx = 0;
@@ -967,7 +1019,8 @@
       bx += bw + (60 + Math.random() * 90);
     }
     SP.rain = [];
-    for(let i = 0; i < 70; i++){
+    const dropCount = isSmartTV ? 20 : 70; // Massive drop reduction on TV
+    for(let i = 0; i < dropCount; i++){
       SP.rain.push({ x: Math.random()*W, y: Math.random()*H, len: 16+Math.random()*10, speed: 700+Math.random()*250 });
     }
   };
@@ -1094,7 +1147,8 @@
         ctx.beginPath(); ctx.moveTo(SP.hero.anchorX - SP.camX, SP.hero.anchorY); ctx.lineTo(SP.hero.x - SP.camX, SP.hero.y); ctx.stroke();
       }
       for(const d of SP.demons){
-        ctx.save(); ctx.fillStyle = '#ff0033'; ctx.shadowColor = '#ff0033'; ctx.shadowBlur = 20;
+        ctx.save(); ctx.fillStyle = '#ff0033';
+        setCanvasShadow('#ff0033', 20);
         ctx.beginPath(); ctx.arc(d.x - SP.camX, d.y, d.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
       }
       
@@ -1107,8 +1161,7 @@
       ctx.translate(hx, hy);
       ctx.rotate(swingAngle);
 
-      ctx.shadowColor = '#ff2d55';
-      ctx.shadowBlur = 16;
+      setCanvasShadow('#ff2d55', 16);
       ctx.strokeStyle = '#ff2d55';
       ctx.lineWidth = 2.4;
       ctx.lineCap = 'round';
@@ -1146,7 +1199,7 @@
       ctx.fill(); ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
-      ctx.shadowColor = '#bf5af2'; ctx.shadowBlur = 8;
+      setCanvasShadow('#bf5af2', 8);
       ctx.beginPath();
       ctx.moveTo(-4.5, -15); ctx.lineTo(-1.5, -13); ctx.lineTo(-4, -11); ctx.closePath(); ctx.fill();
       ctx.beginPath();
